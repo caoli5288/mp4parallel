@@ -26,10 +26,8 @@ function encodec() {(
     find . -name ".$1.tmp*mkv"  |
         parallel --env vencode  \
                  --env FOPTS    \
-                 -S 1/root@one.mengcraft.com    \
-                 -S 1/root@three.mengcraft.com  \
-                 -S 1/root@four.mengcraft.com   \
-                 -S 1/root@five.mengcraft.com   \
+                 -S 1/root@one.sample.com  \
+                 -S 1/root@two.sample.com  \
                  --trc {.}.target.mkv   \
                  vencode {} {.}.target.mkv
     # 计算合并视频参数
