@@ -1,0 +1,73 @@
+#!/bin/bash
+
+function argnumb() {
+    echo $#
+}
+
+function vencode() {(
+    COPTS="-vcodec libx264 -crf 25 -tune psnr -preset placebo"
+    if [ "$FOPTS" ]; then
+        COPTS="$FOPTS $COPTS"
+    fi
+    ffmpeg -y -v quiet -i $1 $COPTS $2
+)}
+
+function encodec() {(
+    # 在本地编码音频流
+    if   [ ! $ANONE ] && [ $ACOPY ]; then
+        ffmpeg -v quiet -i $1 -vn -codec copy .$1.tmp.m4a
+    elif [ ! $ANONE ]; then
+        ffmpeg -v quiet -i $1 -vn -f wav - |
+            neroAacEnc -q 0.3 -ignorelength -if - -of .$1.tmp.m4a
+    fi
+    # 在本地分割视频流
+    mkvmerge -q --no-audio -o .$1.tmp.mkv --split 2048k $1
+    # 任务分布到服务器
+    find . -name ".$1.tmp*mkv"  |
+        parallel --env vencode  \
+                 --env FOPTS    \
+                 -S 1/root@one.mengcraft.com    \
+                 -S 1/root@three.mengcraft.com  \
+                 -S 1/root@four.mengcraft.com   \
+                 -S 1/root@five.mengcraft.com   \
+                 --trc {.}.target.mkv   \
+                 vencode {} {.}.target.mkv
+    # 计算合并视频参数
+    R=`find . -name ".$1.tmp*target.mkv" | sort`
+    T=`argnumb $R`
+    J=0
+    for I in $R; do
+        S="$S -S -T --no-global-tags --no-chapters"
+        if [[ $J > 0 ]]; then
+            S="$S + "
+        fi
+        S="$S $I"
+        J=$[J+1]
+    done
+    # 开始合并视频文件
+    mkvmerge -q -o .$1.tmp.mkv $S
+    # 备份原视音频文件
+    if [ "$1" = "$2" ]; then
+        mv $1 ${1}.bak
+    fi
+    # 混流视频音频轨道
+    if [ $ANONE ]; then
+        ffmpeg -y -v quiet -i .$1.tmp.mkv -codec copy $2
+    else
+        ffmpeg -y -v quiet -i .$1.tmp.mkv -i .$1.tmp.m4a -codec copy $2
+    fi
+    # 删除不用了的文件
+    rm -rf .$1.tmp*
+)}
+
+if [[ $# < 1 ]]; then
+    echo "No input file(s) define."
+    exit 1
+fi
+
+export -f argnumb
+export -f vencode
+export -f encodec
+
+parallel encodec {} {.}.mp4 ::: $@
+
