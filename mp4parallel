@@ -9,9 +9,9 @@ function _my_encode() {
     if   [ ! $ANONE ] && [ $ACOPY ]; then
         ffmpeg -v quiet -i $1 -vn -codec copy .$1.tmp.m4a
     elif [ ! $ANONE ]; then
-        ffmpeg -v quiet -i $1 -vn -f wav - | neroAacEnc 
-            -q 0.3 -ignorelength 
-            -if - 
+        ffmpeg -v quiet -i $1 -vn -f wav - | neroAacEnc \
+            -q 0.3 -ignorelength \
+            -if - \
             -of .$1.tmp.m4a
     fi
     # 在本地分割视频流
