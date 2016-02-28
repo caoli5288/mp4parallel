@@ -1,7 +1,7 @@
 #!/bin/bash
 
 function _ff_encode() {
-    ffmpeg -y -v quiet -i $1 -an -vcodec libx264 -crf 24 -tune psnr -preset veryslow $2
+    ffmpeg -v quiet -i $1 -an -vcodec libx264 -crf 23 -tune psnr -preset veryslow $2
 }
 
 function _my_encode() {
@@ -18,10 +18,10 @@ function _my_encode() {
     mkvmerge -q --no-audio -o .$1.tmp.mkv --split 4096k $1
     # 任务分布到服务器
     find -name ".$1.*.mkv" | parallel --env _ff_encode \
-        -S 1/root@one.mengcraft.com    \
-        -S 1/root@three.mengcraft.com  \
-        -S 1/root@four.mengcraft.com   \
-        -S 1/root@five.mengcraft.com   \
+        -S 1/root@s1.sample.com \
+        -S 1/root@s2.sample.com \
+        -S 1/root@s3.sample.com \
+        -S 1/root@s3.sample.com \
         --trc {.}.target.mkv _ff_encode {} {.}.target.mkv
     # 计算合并视频参数
     for f in .$1.*.target.mkv; do
