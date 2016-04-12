@@ -1,49 +1,42 @@
 #!/bin/bash
 
 function _ff_encode() {
-    ffmpeg -v quiet -i $1 -an -vcodec libx264 -crf 23 -tune psnr -preset veryslow $2
+    ffmpeg -i $1 -an -c:v libx264 -crf 23 -tune psnr -preset veryslow $2
 }
 
 function _my_encode() {
-    # 在本地编码音频流
     if   [ ! $ANONE ] && [ $ACOPY ]; then
-        ffmpeg -v quiet -i $1 -vn -codec copy .$1.tmp.m4a
+        ffmpeg -v -1 -i $1 -vn -c copy .$1.tmp.m4a
     elif [ ! $ANONE ]; then
-        ffmpeg -v quiet -i $1 -vn -f wav - | neroAacEnc \
+        ffmpeg -v -1 -i $1 -vn -f wav - | neroAacEnc \
             -q 0.3 -ignorelength \
             -if - \
             -of .$1.tmp.m4a
     fi
-    # 在本地分割视频流
     mkvmerge -q --no-audio -o .$1.tmp.mkv --split 4096k $1
-    # 任务分布到服务器
     find -name ".$1.*.mkv" | parallel --env _ff_encode \
-        -S 1/root@s1.sample.com \
-        -S 1/root@s2.sample.com \
-        -S 1/root@s3.sample.com \
-        -S 1/root@s3.sample.com \
+        -S 1/root@one.mengcraft.com    \
+        -S 1/root@three.mengcraft.com  \
+        -S 1/root@four.mengcraft.com   \
+        -S 1/root@five.mengcraft.com   \
         --trc {.}.target.mkv _ff_encode {} {.}.target.mkv
-    # 计算合并视频参数
     for f in .$1.*.target.mkv; do
         echo "file '$f'" >> .$1.txt
     done
-    ffmpeg -v quiet -f concat -i .$1.txt -c copy .$1.tmp.mkv
-    # 备份原视音频文件
+    ffmpeg -v -1 -f concat -safe 0 -i .$1.txt -c copy .$1.tmp.mkv
     if [ "$1" = "$2" ]; then
-        mv $1 ${1}.bak
+        mv $1 _$1
     fi
-    # 混流视频音频轨道
     if [ $ANONE ]; then
-        ffmpeg -y -v quiet -i .$1.tmp.mkv -codec copy $2
+        ffmpeg -v -1 -i .$1.tmp.mkv -c copy $2
     else
-        ffmpeg -y -v quiet -i .$1.tmp.mkv -i .$1.tmp.m4a -codec copy $2
+        ffmpeg -v -1 -i .$1.tmp.mkv -i .$1.tmp.m4a -c copy $2
     fi
-    # 删除不用了的文件
     rm -rf .$1.*
 }
 
 if [[ $# < 1 ]]; then
-    echo "No input file(s) define."
+    echo No input file define.
     exit 1
 fi
 
