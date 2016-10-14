@@ -1,46 +1,46 @@
 #!/bin/bash
 
-function _ff_encode() {
-    ffmpeg -i $1 -an -c:v libx264 -crf 23 -tune psnr -preset veryslow $2
-}
-
-function _my_encode() {
-    if   [ ! $ANONE ] && [ $ACOPY ]; then
-        ffmpeg -v -1 -i $1 -vn -c copy .$1.tmp.m4a
-    elif [ ! $ANONE ]; then
-        ffmpeg -v -1 -i $1 -vn -f wav - | neroAacEnc \
-            -q 0.3 -ignorelength \
-            -if - \
-            -of .$1.tmp.m4a
-    fi
-    mkvmerge -q --no-audio -o .$1.tmp.mkv --split 4096k $1
-    find -name ".$1.*.mkv" | parallel --env _ff_encode \
-        -S 1/root@one.mengcraft.com    \
-        -S 1/root@three.mengcraft.com  \
-        -S 1/root@four.mengcraft.com   \
-        -S 1/root@five.mengcraft.com   \
-        --trc {.}.target.mkv _ff_encode {} {.}.target.mkv
-    for f in .$1.*.target.mkv; do
-        echo "file '$f'" >> .$1.txt
-    done
-    ffmpeg -v -1 -f concat -safe 0 -i .$1.txt -c copy .$1.tmp.mkv
-    if [ "$1" = "$2" ]; then
-        mv $1 _$1
-    fi
-    if [ $ANONE ]; then
-        ffmpeg -v -1 -i .$1.tmp.mkv -c copy $2
-    else
-        ffmpeg -v -1 -i .$1.tmp.mkv -i .$1.tmp.m4a -c copy $2
-    fi
-    rm -rf .$1.*
-}
-
-if [[ $# < 1 ]]; then
-    echo No input file define.
+if [ ! $1 ] | [ ! -f $1 ]; then
+    echo "./mp4parallel <input_file> [output_name]"
     exit 1
 fi
 
-export -f _ff_encode
-export -f _my_encode
+if [ ! $2 ]; then
+    i="${1%\.*}.mp4"
+    while [ -f $OUTPUT ]; do
+        i="${OUTPUT%\.*}_1.mp4"
+    done
+    set -- "$1" "$i"
+    unset i
+fi
 
-parallel _my_encode {} {.}.mp4 ::: $@
+ffmpeg -v -1 -i $1 -vn -f wav - | neroAacEnc \
+    -q 0.3 -ignorelength \
+    -if - \
+    -of .$1.m4a
+        
+mkvmerge -q --no-audio -o .$1.mkv --split 4096k $1
+
+FFOPT="-an -c:v libx264 -crf 18 -preset veryslow"
+
+find -name ".$1-*.mkv" | parallel -S 2/root@s1.sample.com \
+    -S 2/root@s2.sample.com \
+    -S 2/root@s3.sample.com \
+    --trc {.}.1.mkv ffmpeg -v -1 -i {} $FFOPT {.}.1.mkv
+    
+for f in .$1-*.1.mkv; do
+    echo "file '$f'" >> .$1.txt
+done
+unset f
+
+ffmpeg -v -1 -f concat -safe 0 -i .$1.txt -c copy .$1.mkv
+
+[ -f $2 ] && mv $2 ${2%\.*}_old.${2##*\.}
+
+if [ -f .$1.m4a ]; then
+    ffmpeg -v -1 -i .$1.mkv -i .$1.m4a -c copy -movflags +faststart $2
+else
+    ffmpeg -v -1 -i .$1.mkv -c copy -movflags +faststart $2
+fi
+
+rm -rf .$1*
